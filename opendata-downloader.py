@@ -6,6 +6,7 @@
  Author:
     Eduard Rosert
  Version history:
+    0.2, 2019-10-17, added --get-latest-timestamp, --min-timestamp option
     0.1, 2019-10-01, initial version
 """
 
@@ -82,15 +83,17 @@ def downloadGribData( model="icon-eu", param="t_2m", timestep=0, timestamp=getMo
 
     downloadAndExtractBz2FileFromUrl(dataUrl, destFilePath=destFilePath, destFileName=destFileName)
 
-def downloadGribDataSequence(model="icon-eu", param="t_2m", maxTimeStep=12, timestamp=getMostRecentModelTimestamp(), destFilePath=None ):
+def downloadGribDataSequence(model="icon-eu", param="t_2m", minTimeStep=0, maxTimeStep=12, timestamp=getMostRecentModelTimestamp(), destFilePath=None ):
     #download data from open data server for the next x steps
-    for timestep in range(maxTimeStep+1):
+    for timestep in range(minTimeStep, maxTimeStep+1):
         downloadGribData(model=model, param=param, timestep=timestep, timestamp=timestamp, destFilePath=destFilePath)
 
 def formatDateIso8601(date):
     return date.replace(microsecond=0,tzinfo=timezone.utc).isoformat()
 
-
+def getTimestampString(date):
+    modelrun = "{0:02d}".format(date.hour)
+    return date.strftime("%Y%m%d"+ modelrun )
 
 parser = argparse.ArgumentParser(
     description='A tool to download grib model data from DWD\'s open data server https://opendata.dwd.de .',
@@ -102,17 +105,26 @@ parser.add_argument('--model', choices=['cosmo-d2', 'icon-eu'],
                     required=True,
                     help='the model name')
 
+parser.add_argument('--get-latest-timestamp',
+                    dest='getLatestTimestamp',
+                    action='store_true',
+                    help='Returns the latest available timestamp for the specified model.')
+
+
 # use it like this: --single-level-fields t_2m pmsl clch ...
 parser.add_argument('--single-level-fields', 
                     dest='params',
                     nargs='+', 
                     metavar='shortName',
                     type=str,
-                    required=True,
+                    default=['t_2m'],
                     help='one or more single-level model fields that should be donwloaded, e.g. t_2m, tmax_2m, clch, pmsl, ...')
 
-parser.add_argument('--max-time-step', dest='maxTimeStep', default=0, type=int,
-                    help='the maximung forecast time step to download, e.g. 12 will download time steps 0 - 12')
+parser.add_argument('--min-time-step', dest='minTimeStep', default=0, type=int,
+                    help='the minimum forecast time step to download (default=0)')
+
+parser.add_argument('--max-time-step', dest='maxTimeStep', default=-1, type=int,
+                    help='the maximung forecast time step to download, e.g. 12 will download time steps from min-time-step - 12. If no max-time-step was defined, no data will be downloaded.')
 
 parser.add_argument('--directory', dest='destFilePath', default=os.getcwd(),
                     help='the download directory')
@@ -166,9 +178,16 @@ if __name__ == "__main__":
     #add custom dialect for csv export
     csv.register_dialect('excel-semicolon', delimiter=';', quoting=csv.QUOTE_ALL, lineterminator='\r\n')
 
-    # wait 6 hrs (=360 minutes) after a model run, just to be sure
-    latestTimestamp = getMostRecentModelTimestamp(waitTimeMinutes=360, modelIntervalHours=3)
+    # wait 5 hrs (=300 minutes) after a model run for icon-eu data
+    # and 1,5 hrs (=90 minute) for cosmo-d2, just to be sure
+    waitTimeMinutes=300
+    if args.model == "cosmo-d2":
+        waitTimeMinutes = 90
+    latestTimestamp = getMostRecentModelTimestamp(waitTimeMinutes=waitTimeMinutes, modelIntervalHours=3)
 
     #download data
     for param in args.params:
-        downloadGribDataSequence(model=args.model, param=param, maxTimeStep=args.maxTimeStep, timestamp=latestTimestamp, destFilePath=args.destFilePath )
+        downloadGribDataSequence(model=args.model, param=param, minTimeStep=args.minTimeStep, maxTimeStep=args.maxTimeStep, timestamp=latestTimestamp, destFilePath=args.destFilePath )
+
+    if args.getLatestTimestamp:
+        print(getTimestampString(latestTimestamp))

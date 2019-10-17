@@ -31,8 +31,10 @@ docker run --rm -i -t eduardrosert/dwd-open-data-downloader:latest python /opend
 ```
 Output:
 ```
-usage: opendata-downloader.py [-h] --model {cosmo-d2,icon-eu}
-                              --single-level-fields shortName [shortName ...]
+uusage: opendata-downloader.py [-h] --model {cosmo-d2,icon-eu}
+                              [--get-latest-timestamp]
+                              [--single-level-fields shortName [shortName ...]]
+                              [--min-time-step MINTIMESTEP]
                               [--max-time-step MAXTIMESTEP]
                               [--directory DESTFILEPATH]
                               [--http-proxy proxy_name_or_ip:port] [-v]
@@ -44,12 +46,19 @@ optional arguments:
   -h, --help            show this help message and exit
   --model {cosmo-d2,icon-eu}
                         the model name
+  --get-latest-timestamp
+                        Returns the latest available timestamp for the
+                        specified model.
   --single-level-fields shortName [shortName ...]
                         one or more single-level model fields that should be
                         donwloaded, e.g. t_2m, tmax_2m, clch, pmsl, ...
+  --min-time-step MINTIMESTEP
+                        the minimum forecast time step to download (default=0)
   --max-time-step MAXTIMESTEP
                         the maximung forecast time step to download, e.g. 12
-                        will download time steps 0 - 12
+                        will download time steps from min-time-step - 12. If
+                        no max-time-step was defined, no data will be
+                        downloaded.
   --directory DESTFILEPATH
                         the download directory
   --http-proxy proxy_name_or_ip:port
