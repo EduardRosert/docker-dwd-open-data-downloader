@@ -23,3 +23,8 @@ login-user-pass:
 
 push: login
 	@docker push ${NAME}
+
+test-local:
+	@-mkdir grib-data
+	@export MODEL_NAME=icon-eu && export MODEL_FIELDS=t_2m pmsl clct tot_prec && export MAX_TIME_STEP=24 && export GRIB_DIRECTORY=./grib-data/
+	@python ./opendata-downloader.py --model $$MODEL_NAME --single-level-fields $$MODEL_FIELDS --min-time-step 0 --max-time-step $$MAX_TIME_STEP -v --directory $$GRIB_DIRECTORY
