@@ -21,10 +21,19 @@ try:
     import os
     from datetime import datetime, timedelta, timezone
     import logging as log
+    from extendedformatter import ExtendedFormatter
 except ImportError as ie:
     print("required libraries could not be found:")
     print(ie)
     sys.exit(1)
+
+# custom stringFormatter with uppercase/lowercase functionality
+stringFormatter = ExtendedFormatter()
+supportedModels = {}
+with open("models.json","r") as jsonfile:
+    models = json.load(jsonfile)
+    for model in models:
+        supportedModels[model["model"]] = model
 
 
 def configureHttpProxyForUrllib( proxySettings = {'http': 'proxyserver:8080'} ):
@@ -60,33 +69,35 @@ def downloadAndExtractBz2FileFromUrl( url , destFilePath=None, destFileName=None
         outfile.write(binaryData)
     log.info("Done.")
 
-def getGribFileUrl(model="icon-eu", param="t_2m", timestep=0, timestamp=getMostRecentModelTimestamp(waitTimeMinutes=180, modelIntervalHours=12)):
-    modelrun = "{0:02d}".format(timestamp.hour)
-    scope = "unknown"
-    model = model.lower()
-    if model == "icon-eu":
-        scope = "europe"
-    elif model == "cosmo-d2":
-        scope = "germany"
-    urlPattern = "https://opendata.dwd.de/weather/nwp/{0}/grib/{4}/{2}/{0}_{6}_regular-lat-lon_single-level_{1}_{3:03d}_{5}.grib2.bz2"
-    return urlPattern.format(
-                            model,
-                            timestamp.strftime("%Y%m%d"+ modelrun ), 
-                            param.lower(), 
-                            timestep, 
-                            modelrun, 
-                            param.upper(), 
-                            scope )
+def getGribFileUrl(model="icon-eu", grid=None, param="t_2m", timestep=0, timestamp=getMostRecentModelTimestamp(waitTimeMinutes=180, modelIntervalHours=12)):
+    cfg = supportedModels[model]
+    levtype = "single-level"
+    grid = "regular-lat-lon"
+    if (grid is None) or (grid not in cfg["grids"]):
+        grid = cfg["grids"][0]
+    url = cfg["pattern"]["single-level"]
+    # pattern is something like this:
+    #  "https://opendata.dwd.de/weather/nwp/{model!l}/grib/{modelrun:>02d}/{param!l}/{model!l}_{scope}_{grid}_{levtype}_{timestamp:%Y%m%d}{modelrun:>02d}_{step:>03d}_{param!u}.grib2.bz2"
+    # e.g. https://opendata.dwd.de/weather/nwp/icon/grib/09/t_2m/icon_global_icosahedral_single-level_2020062609_000_T_2M.grib2.bz2
+    return stringFormatter.format( url,
+        model = cfg["model"],
+        param = param,
+        grid = grid,
+        modelrun = timestamp.hour,
+        scope = cfg["scope"],
+        levtype = levtype,
+        timestamp = timestamp,
+        step = timestep)
 
-def downloadGribData( model="icon-eu", param="t_2m", timestep=0, timestamp=getMostRecentModelTimestamp(), destFilePath=None, destFileName=None ):
-    dataUrl=getGribFileUrl(model=model, param=param, timestep=timestep, timestamp=timestamp)#
+def downloadGribData( model="icon-eu", grid=None, param="t_2m", timestep=0, timestamp=getMostRecentModelTimestamp(), destFilePath=None, destFileName=None ):
+    dataUrl=getGribFileUrl(model=model, grid=None, param=param, timestep=timestep, timestamp=timestamp)#
 
     downloadAndExtractBz2FileFromUrl(dataUrl, destFilePath=destFilePath, destFileName=destFileName)
 
-def downloadGribDataSequence(model="icon-eu", param="t_2m", minTimeStep=0, maxTimeStep=12, timestamp=getMostRecentModelTimestamp(), destFilePath=None ):
+def downloadGribDataSequence(model="icon-eu", grid=None, param="t_2m", minTimeStep=0, maxTimeStep=12, timestamp=getMostRecentModelTimestamp(), destFilePath=None ):
     #download data from open data server for the next x steps
     for timestep in range(minTimeStep, maxTimeStep+1):
-        downloadGribData(model=model, param=param, timestep=timestep, timestamp=timestamp, destFilePath=destFilePath)
+        downloadGribData(model=model, grid=None, param=param, timestep=timestep, timestamp=timestamp, destFilePath=destFilePath)
 
 def formatDateIso8601(date):
     return date.replace(microsecond=0,tzinfo=timezone.utc).isoformat()
@@ -99,10 +110,17 @@ parser = argparse.ArgumentParser(
     description='A tool to download grib model data from DWD\'s open data server https://opendata.dwd.de .',
     add_help=True)
 
-parser.add_argument('--model', choices=['cosmo-d2', 'icon-eu'],
+parser.add_argument('--model', choices=supportedModels.keys(),
                     dest='model',
                     type=str,
                     required=True,
+                    help='the model name')
+
+parser.add_argument('--grid', choices=["icosahedral", "regular-lat-lon", "rotated-lat-lon"],
+                    dest='grid',
+                    type=str,
+                    required=False,
+                    default=None,
                     help='the model name')
 
 parser.add_argument('--get-latest-timestamp',
@@ -136,8 +154,12 @@ parser.add_argument("-v", "--verbose", help="increase output verbosity",
                     action="store_const", dest="loglevel", const=log.INFO)
 
 """
-usage: opendata-downloader.py [-h] --model {cosmo-d2,icon-eu}
-                              --single-level-fields shortName [shortName ...]
+usage: opendata-downloader.py [-h] --model
+                              {cosmo-d2,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
+                              [--grid {icosahedral,regular-lat-lon,rotated-lat-lon}]
+                              [--get-latest-timestamp]
+                              [--single-level-fields shortName [shortName ...]]
+                              [--min-time-step MINTIMESTEP]
                               [--max-time-step MAXTIMESTEP]
                               [--directory DESTFILEPATH]
                               [--http-proxy proxy_name_or_ip:port] [-v]
@@ -147,14 +169,23 @@ https://opendata.dwd.de .
 
 optional arguments:
   -h, --help            show this help message and exit
-  --model {cosmo-d2,icon-eu}
+  --model {cosmo-d2,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
                         the model name
+  --grid {icosahedral,regular-lat-lon,rotated-lat-lon}
+                        the model name
+  --get-latest-timestamp
+                        Returns the latest available timestamp for the
+                        specified model.
   --single-level-fields shortName [shortName ...]
                         one or more single-level model fields that should be
                         donwloaded, e.g. t_2m, tmax_2m, clch, pmsl, ...
+  --min-time-step MINTIMESTEP
+                        the minimum forecast time step to download (default=0)
   --max-time-step MAXTIMESTEP
                         the maximung forecast time step to download, e.g. 12
-                        will download time steps 0 - 12
+                        will download time steps from min-time-step - 12. If
+                        no max-time-step was defined, no data will be
+                        downloaded.
   --directory DESTFILEPATH
                         the download directory
   --http-proxy proxy_name_or_ip:port
@@ -180,14 +211,14 @@ if __name__ == "__main__":
 
     # wait 5 hrs (=300 minutes) after a model run for icon-eu data
     # and 1,5 hrs (=90 minute) for cosmo-d2, just to be sure
-    waitTimeMinutes=300
-    if args.model == "cosmo-d2":
-        waitTimeMinutes = 90
-    latestTimestamp = getMostRecentModelTimestamp(waitTimeMinutes=waitTimeMinutes, modelIntervalHours=3)
+    selectedModel = supportedModels[args.model.lower()]
+    openDataDeliveryOffsetMinutes = selectedModel["openDataDeliveryOffsetMinutes"]
+    modelIntervalHours = selectedModel["intervalHours"]
+    latestTimestamp = getMostRecentModelTimestamp(waitTimeMinutes=openDataDeliveryOffsetMinutes, modelIntervalHours=modelIntervalHours)
 
     #download data
     for param in args.params:
-        downloadGribDataSequence(model=args.model, param=param, minTimeStep=args.minTimeStep, maxTimeStep=args.maxTimeStep, timestamp=latestTimestamp, destFilePath=args.destFilePath )
+        downloadGribDataSequence(model=selectedModel["model"], grid=args.grid, param=param, minTimeStep=args.minTimeStep, maxTimeStep=args.maxTimeStep, timestamp=latestTimestamp, destFilePath=args.destFilePath )
 
     if args.getLatestTimestamp:
         print(getTimestampString(latestTimestamp))
