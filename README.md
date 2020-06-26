@@ -31,7 +31,9 @@ docker run --rm -i -t eduardrosert/dwd-open-data-downloader:latest python /opend
 ```
 Output:
 ```
-uusage: opendata-downloader.py [-h] --model {cosmo-d2,icon-eu}
+usage: opendata-downloader.py [-h] --model
+                              {cosmo-d2,cosmo-d2-eps,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
+                              [--grid {icosahedral,regular-lat-lon,rotated-lat-lon}]
                               [--get-latest-timestamp]
                               [--single-level-fields shortName [shortName ...]]
                               [--min-time-step MINTIMESTEP]
@@ -44,8 +46,10 @@ https://opendata.dwd.de .
 
 optional arguments:
   -h, --help            show this help message and exit
-  --model {cosmo-d2,icon-eu}
+  --model {cosmo-d2,cosmo-d2-eps,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
                         the model name
+  --grid {icosahedral,regular-lat-lon,rotated-lat-lon}
+                        the grid type
   --get-latest-timestamp
                         Returns the latest available timestamp for the
                         specified model.

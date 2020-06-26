@@ -121,7 +121,7 @@ parser.add_argument('--grid', choices=["icosahedral", "regular-lat-lon", "rotate
                     type=str,
                     required=False,
                     default=None,
-                    help='the model name')
+                    help='the grid type')
 
 parser.add_argument('--get-latest-timestamp',
                     dest='getLatestTimestamp',
@@ -155,7 +155,7 @@ parser.add_argument("-v", "--verbose", help="increase output verbosity",
 
 """
 usage: opendata-downloader.py [-h] --model
-                              {cosmo-d2,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
+                              {cosmo-d2,cosmo-d2-eps,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
                               [--grid {icosahedral,regular-lat-lon,rotated-lat-lon}]
                               [--get-latest-timestamp]
                               [--single-level-fields shortName [shortName ...]]
@@ -169,10 +169,10 @@ https://opendata.dwd.de .
 
 optional arguments:
   -h, --help            show this help message and exit
-  --model {cosmo-d2,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
+  --model {cosmo-d2,cosmo-d2-eps,icon,icon-eps,icon-eu,icon-eu-eps,icon-d2,icon-d2-eps}
                         the model name
   --grid {icosahedral,regular-lat-lon,rotated-lat-lon}
-                        the model name
+                        the grid type
   --get-latest-timestamp
                         Returns the latest available timestamp for the
                         specified model.
