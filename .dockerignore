@@ -1,5 +1,4 @@
 .vscode*
-*.md
 *.grib2
 *.pyc
 Makefile

@@ -1,7 +1,11 @@
-FROM python:3.7-alpine
+FROM python:3.7-alpine as build
 
 # copy the script
-COPY ./opendata-downloader.py /
+COPY . /src/
+
+RUN set -ex \
+    && cd /src \
+    && pip install .
 
 # display help
-CMD python ./opendata-downloader.py --help
+CMD downloader --help
